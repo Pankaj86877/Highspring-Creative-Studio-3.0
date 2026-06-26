@@ -55,9 +55,15 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     new_post_data = json.dumps(precision_payload).encode('utf-8')
                     self.proxy_magnific_post('https://api.magnific.com/v1/ai/image-upscaler-precision-v2', post_data=new_post_data)
                 else:
+                    scale_val = payload.get('scale_factor', 2)
+                    if not isinstance(scale_val, str):
+                        scale_val = f"{scale_val}x"
+                    elif not scale_val.endswith('x'):
+                        scale_val = f"{scale_val}x"
+
                     creative_payload = {
                         'image': payload.get('image'),
-                        'scale_factor': payload.get('scale_factor', 2),
+                        'scale_factor': scale_val,
                         'creativity': payload.get('creativity', 4),
                         'resemblance': payload.get('resemblance', 6),
                         'hdr': payload.get('hdr', 3)
