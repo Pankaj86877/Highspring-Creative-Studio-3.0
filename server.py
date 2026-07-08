@@ -74,9 +74,116 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 target = 'https://api.magnific.com/v1/ai/image-upscaler-precision-v2' if model == 'precision' else 'https://api.magnific.com/v1/ai/image-upscaler'
                 self.proxy_magnific_post(target, post_data=post_data)
         elif parsed_url.path == '/api/magnific/bg-remove':
-            self.proxy_magnific_post('https://api.magnific.com/v1/ai/bg-remove')
+            # Step 1: Parse multipart body to extract the image file bytes
+            content_length = int(self.headers.get('Content-Length', 0))
+            raw_body = self.rfile.read(content_length)
+            content_type = self.headers.get('Content-Type', '')
+
+            try:
+                import email.parser
+                import email.policy
+
+                # Build a fake email message to parse the multipart body
+                msg_str = f'Content-Type: {content_type}\r\n\r\n'.encode() + raw_body
+                msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(msg_str)
+
+                img_bytes = None
+                img_mime = 'image/jpeg'
+                img_name = 'image.jpg'
+
+                print("[Proxy] content_type:", content_type)
+                print("[Proxy] is_multipart:", msg.is_multipart())
+
+                if msg.is_multipart():
+                    payload = msg.get_payload()
+                    print("[Proxy] parts count:", len(payload))
+                    for part in payload:
+                        cd = str(part.get('Content-Disposition', ''))
+                        print("[Proxy] part content-disposition:", cd)
+                        if 'image_file' in cd:
+                            img_bytes = part.get_payload(decode=True)
+                            img_mime = part.get_content_type() or 'image/jpeg'
+                            # Get filename from Content-Disposition
+                            fname = part.get_filename()
+                            if fname:
+                                img_name = fname
+                            print("[Proxy] found image_file, bytes length:", len(img_bytes) if img_bytes else 0)
+                            break
+
+                if img_bytes is None:
+                    print("[Proxy] img_bytes is None!")
+                    self.send_response(400)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(b'{"error": "No image_file field found in upload"}')
+                    return
+
+                # Step 2: Upload to Litterbox (Catbox) to get a public URL
+                import io, uuid
+                boundary = b'----PxBoundary' + uuid.uuid4().hex.encode()
+                catbox_body = (
+                    b'--' + boundary + b'\r\n'
+                    b'Content-Disposition: form-data; name="reqtype"\r\n\r\n'
+                    b'fileupload\r\n'
+                    b'--' + boundary + b'\r\n'
+                    b'Content-Disposition: form-data; name="time"\r\n\r\n'
+                    b'1h\r\n'
+                    b'--' + boundary + b'\r\n' +
+                    (f'Content-Disposition: form-data; name="fileToUpload"; filename="{img_name}"\r\n'
+                     f'Content-Type: {img_mime}\r\n\r\n').encode() +
+                    img_bytes + b'\r\n' +
+                    b'--' + boundary + b'--\r\n'
+                )
+                catbox_req = urllib.request.Request(
+                    'https://litterbox.catbox.moe/resources/internals/api.php',
+                    data=catbox_body,
+                    headers={
+                        'Content-Type': f'multipart/form-data; boundary={boundary.decode()}',
+                        'User-Agent': 'Mozilla/5.0'
+                    },
+                    method='POST'
+                )
+                with urllib.request.urlopen(catbox_req, timeout=60) as cr:
+                    public_url = cr.read().decode('utf-8').strip()
+
+                print("[Proxy] public_url from litterbox:", public_url)
+
+                if not public_url.startswith('https://'):
+                    raise Exception(f'Litterbox upload failed: {public_url}')
+
+                # Step 3: POST public URL to Magnific remove-background
+                magnific_body = urllib.parse.urlencode({'image_url': public_url}).encode()
+                magnific_req = urllib.request.Request(
+                    'https://api.magnific.com/v1/ai/beta/remove-background',
+                    data=magnific_body,
+                    headers={
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
+                        'x-magnific-api-key': API_KEY
+                    },
+                    method='POST'
+                )
+                with urllib.request.urlopen(magnific_req, timeout=60) as mr:
+                    result = mr.read()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(result)
+
+            except urllib.error.HTTPError as e:
+                self.send_response(e.code)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(e.read())
+            except Exception as e:
+                import json as _json
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(_json.dumps({'error': str(e)}).encode())
         else:
             super().do_POST()
+
 
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
