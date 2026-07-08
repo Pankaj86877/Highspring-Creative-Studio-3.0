@@ -1,1 +1,1 @@
-# HS-Creative-Studio-2.0
+# HS-Creative-Studio-3.0
