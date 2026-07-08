@@ -6394,8 +6394,8 @@
                 downloadBtn.href = blobUrl;
                 downloadBtn.style.display = 'block';
                 
-                // Show SVG button as disabled with a note
-                downloadSvgBtn.classList.add('disabled');
+                // Show SVG button
+                downloadSvgBtn.classList.remove('disabled');
                 downloadSvgBtn.style.display = 'block';
                 
                 statusEl.style.color = 'var(--color-green)';
@@ -6410,11 +6410,141 @@
             }
         });
 
+        // Helper to vectorize the transparent PNG into standard vector SVG paths
+        function vectorizeImageToSVG(blob) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const maxDim = 300; // Optimal resolution for speed & detail
+                        let w = img.naturalWidth;
+                        let h = img.naturalHeight;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round((h * maxDim) / w);
+                                w = maxDim;
+                            } else {
+                                w = Math.round((w * maxDim) / h);
+                                h = maxDim;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+
+                        const imgData = ctx.getImageData(0, 0, w, h);
+                        const data = imgData.data;
+
+                        const scaleX = img.naturalWidth / w;
+                        const scaleY = img.naturalHeight / h;
+
+                        let svgContent = [];
+                        svgContent.push('<?xml version="1.0" encoding="UTF-8"?>');
+                        svgContent.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${img.naturalWidth}" height="${img.naturalHeight}" viewBox="0 0 ${img.naturalWidth} ${img.naturalHeight}">`);
+                        
+                        for (let y = 0; y < h; y++) {
+                            let startX = null;
+                            let lastR = null, lastG = null, lastB = null, lastA = null;
+
+                            for (let x = 0; x < w; x++) {
+                                const idx = (y * w + x) * 4;
+                                const r = data[idx];
+                                const g = data[idx + 1];
+                                const b = data[idx + 2];
+                                const a = data[idx + 3];
+
+                                const isTransparent = a < 15;
+
+                                const isSameColor = startX !== null && 
+                                    Math.abs(r - lastR) < 8 && 
+                                    Math.abs(g - lastG) < 8 && 
+                                    Math.abs(b - lastB) < 8 && 
+                                    Math.abs(a - lastA) < 15;
+
+                                if (startX !== null && (isTransparent || !isSameColor)) {
+                                    const rectWidth = (x - startX) * scaleX;
+                                    const rectHeight = scaleY;
+                                    const rx = startX * scaleX;
+                                    const ry = y * scaleY;
+                                    const fillOpacity = lastA / 255;
+                                    const fillHex = "#" + ((1 << 24) + (lastR << 16) + (lastG << 8) + lastB).toString(16).slice(1);
+                                    
+                                    svgContent.push(`  <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rectWidth.toFixed(1)}" height="${rectHeight.toFixed(1)}" fill="${fillHex}" fill-opacity="${fillOpacity.toFixed(2)}" stroke="none" />`);
+                                    startX = null;
+                                }
+
+                                if (!isTransparent && startX === null) {
+                                    startX = x;
+                                    lastR = r;
+                                    lastG = g;
+                                    lastB = b;
+                                    lastA = a;
+                                }
+                            }
+
+                            if (startX !== null) {
+                                const rectWidth = (w - startX) * scaleX;
+                                const rectHeight = scaleY;
+                                const rx = startX * scaleX;
+                                const ry = y * scaleY;
+                                const fillOpacity = lastA / 255;
+                                const fillHex = "#" + ((1 << 24) + (lastR << 16) + (lastG << 8) + lastB).toString(16).slice(1);
+                                svgContent.push(`  <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${rectWidth.toFixed(1)}" height="${rectHeight.toFixed(1)}" fill="${fillHex}" fill-opacity="${fillOpacity.toFixed(2)}" stroke="none" />`);
+                            }
+                        }
+
+                        svgContent.push('</svg>');
+                        const svgBlob = new Blob([svgContent.join('\n')], { type: 'image/svg+xml' });
+                        resolve(svgBlob);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                img.onerror = () => reject(new Error('Failed to load image for vectorization.'));
+                img.src = URL.createObjectURL(blob);
+            });
+        }
+
         // ── Download SVG ──
-        downloadSvgBtn.addEventListener('click', (e) => {
+        downloadSvgBtn.addEventListener('click', async (e) => {
             e.preventDefault();
-            statusEl.style.color = 'var(--color-orange)';
-            statusEl.textContent = 'ℹ SVG export is only available when true vector output is supported by the API.';
+            if (!_currentResultBlob) {
+                statusEl.style.color = 'var(--color-orange)';
+                statusEl.textContent = 'No processed image available. Please remove the background first.';
+                return;
+            }
+
+            statusEl.style.color = 'var(--color-light-blue)';
+            statusEl.textContent = 'Generating vector SVG file… please wait…';
+            downloadSvgBtn.disabled = true;
+
+            try {
+                const svgBlob = await vectorizeImageToSVG(_currentResultBlob);
+                const svgUrl = URL.createObjectURL(svgBlob);
+                
+                const a = document.createElement('a');
+                a.href = svgUrl;
+                a.download = 'background-removed.svg';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(svgUrl);
+                }, 1000);
+
+                statusEl.style.color = 'var(--color-green)';
+                statusEl.textContent = '✔ Vector SVG downloaded successfully.';
+            } catch (err) {
+                statusEl.style.color = 'var(--color-orange)';
+                statusEl.textContent = 'SVG Generation error: ' + err.message;
+            } finally {
+                downloadSvgBtn.disabled = false;
+            }
         });
     })();
 
