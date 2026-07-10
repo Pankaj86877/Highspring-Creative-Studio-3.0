@@ -284,6 +284,44 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(_json.dumps({'error': str(e)}).encode())
+        elif parsed_url.path == '/api/removebg/bg-remove':
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            try:
+                print("[Proxy] Forwarding request to remove.bg API...")
+                req = urllib.request.Request(
+                    'https://api.remove.bg/v1.0/removebg',
+                    data=post_data,
+                    headers={
+                        'Content-Type': self.headers.get('Content-Type', ''),
+                        'X-Api-Key': 'cLGBSpgEQDGD8jR8k5XBVKGR'
+                    },
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=60) as response:
+                    self.send_response(response.status)
+                    for key, val in response.getheaders():
+                        if key.lower() not in ['content-encoding', 'transfer-encoding', 'connection', 'access-control-allow-origin']:
+                            self.send_header(key, val)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Access-Control-Allow-Private-Network', 'true')
+                    self.end_headers()
+                    self.wfile.write(response.read())
+            except urllib.error.HTTPError as e:
+                print(f"[Proxy] HTTPError {e.code} from remove.bg:")
+                traceback.print_exc()
+                self.send_response(e.code)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(e.read())
+            except Exception as e:
+                print("[Proxy] Exception in remove.bg handler:")
+                traceback.print_exc()
+                import json as _json
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(_json.dumps({'error': str(e)}).encode())
         else:
             super().do_POST()
 
