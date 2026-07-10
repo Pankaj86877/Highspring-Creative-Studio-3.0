@@ -6389,7 +6389,7 @@
         }
 
         async function removeWithMagnific(file) {
-            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://127.0.0.1:8888';
+            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
             statusEl.textContent = 'Uploading to Magnific AI engine…';
 
             const form = new FormData();
@@ -7039,7 +7039,7 @@
 
     /* ─── AI GENERATOR & IMAGE FILLER STUDIOS ───────────────────── */
     (function () {
-        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://127.0.0.1:8888';
+        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
 
         // ==========================================
         // 1. AI Image Generator Logic
@@ -8204,7 +8204,7 @@
     // 3. AI Image Upscaler Engine
     // ==========================================
     (function () {
-        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://127.0.0.1:8888';
+        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
         const aiuFileInput = document.getElementById('aiu-file-input');
         const aiuDzZone = document.getElementById('aiu-dz-zone');
         const aiuUploadLabel = document.getElementById('aiu-upload-label');
