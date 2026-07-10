@@ -3024,20 +3024,30 @@
             <div class="workspace-grid" style="max-width:680px;">
 
                 <!-- Provider Selection -->
-                <div style="margin-bottom:20px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                    <div style="flex: 1;">
-                        <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8899aa;margin-bottom:8px;">Select AI Provider</div>
-                        <select id="bgr-provider-select" style="width:100%; background:rgba(7,41,66,0.6); border:1px solid rgba(45,191,249,0.2); border-radius:8px; padding:10px 12px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:13px; outline:none; cursor:pointer; transition:border-color var(--transition-fast);">
-                            <option value="existing" selected>☁️ Remove Background API (Existing)</option>
-                            <option value="magnific">✨ Magnific API</option>
-                            <option value="rembg">💻 rembg (Local / Open Source)</option>
-                            <option value="bgRemoveApi">🌐 bg-remove-api (REST API)</option>
-                            <option value="withoutBg">⚡ withoutBG (High Quality Open Source)</option>
-                        </select>
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8899aa;margin-bottom:10px;">Select AI Provider</div>
+                    <div class="bgr-providers">
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-existing" name="bgrProvider" value="existing" checked>
+                            <label for="bgr-provider-existing" class="bgr-provider-label">☁️ Remove.bg API</label>
+                        </div>
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-magnific" name="bgrProvider" value="magnific">
+                            <label for="bgr-provider-magnific" class="bgr-provider-label">✨ Magnific API</label>
+                        </div>
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-rembg" name="bgrProvider" value="rembg">
+                            <label for="bgr-provider-rembg" class="bgr-provider-label">💻 rembg (Local)</label>
+                        </div>
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-bgremove" name="bgrProvider" value="bgRemoveApi">
+                            <label for="bgr-provider-bgremove" class="bgr-provider-label">🌐 bg-remove-api</label>
+                        </div>
+                        <div class="bgr-provider-btn" style="grid-column: span 2;">
+                            <input type="radio" id="bgr-provider-withoutbg" name="bgrProvider" value="withoutBg">
+                            <label for="bgr-provider-withoutbg" class="bgr-provider-label">⚡ withoutBG (Open Source)</label>
+                        </div>
                     </div>
-                    <button id="bgr-settings-toggle-btn" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; height:41px; margin-top:20px; color:var(--color-light-blue); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all var(--transition-fast);" title="Configure Provider Endpoints">
-                        ⚙️
-                    </button>
                 </div>
 
                 <!-- Settings Panel for Self-Hosted Provider Endpoints -->
@@ -6415,13 +6425,18 @@
             return file;
         }
 
-        // Collapsible settings panel toggle
-        const settingsToggleBtn = document.getElementById('bgr-settings-toggle-btn');
         const settingsPanel = document.getElementById('bgr-settings-panel');
-        settingsToggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
-        });
+        function updateSettingsVisibility() {
+            const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
+            if (['rembg', 'bgRemoveApi', 'withoutBg'].includes(selectedProvider)) {
+                settingsPanel.style.display = 'block';
+                document.getElementById('bgr-endpoint-rembg').style.borderColor = selectedProvider === 'rembg' ? 'rgba(45,191,249,0.5)' : 'rgba(255,255,255,0.1)';
+                document.getElementById('bgr-endpoint-bg-remove-api').style.borderColor = selectedProvider === 'bgRemoveApi' ? 'rgba(45,191,249,0.5)' : 'rgba(255,255,255,0.1)';
+                document.getElementById('bgr-endpoint-without-bg').style.borderColor = selectedProvider === 'withoutBg' ? 'rgba(45,191,249,0.5)' : 'rgba(255,255,255,0.1)';
+            } else {
+                settingsPanel.style.display = 'none';
+            }
+        }
 
         // Bind endpoints to localStorage with defaults
         const endpointKeys = {
@@ -6449,6 +6464,12 @@
             }
         });
 
+        // Event listeners for radio changes
+        document.querySelectorAll('input[name="bgrProvider"]').forEach(radio => {
+            radio.addEventListener('change', updateSettingsVisibility);
+        });
+        updateSettingsVisibility(); // Run on startup
+
         // Provider registry using modular loaded services
         const providers = {
             magnific: (file, status) => window.BackgroundServices.magnific(file, status),
@@ -6459,8 +6480,7 @@
         };
 
         async function processBackgroundRemoval(file) {
-            const selectEl = document.getElementById('bgr-provider-select');
-            const selectedProvider = selectEl ? selectEl.value : 'existing';
+            const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
             const providerFn = providers[selectedProvider] || providers.existing;
             return await providerFn(file, statusEl);
         }
