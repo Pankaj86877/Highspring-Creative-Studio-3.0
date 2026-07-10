@@ -138,35 +138,116 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 public_url = None
                 last_err = None
-                for attempt in range(3):
+
+                # Method 1: Try Litterbox
+                try:
+                    print("[Proxy] Uploading to Litterbox...")
+                    catbox_req = urllib.request.Request(
+                        'https://litterbox.catbox.moe/resources/internals/api.php',
+                        data=catbox_body,
+                        headers={
+                            'Content-Type': f'multipart/form-data; boundary={boundary.decode()}',
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        },
+                        method='POST'
+                    )
+                    with urllib.request.urlopen(catbox_req, timeout=15) as cr:
+                        res_text = cr.read().decode('utf-8').strip()
+                    if res_text.startswith('https://'):
+                        public_url = res_text
+                        print("[Proxy] Litterbox upload succeeded:", public_url)
+                    else:
+                        last_err = f"Litterbox response error: {res_text}"
+                        print("[Proxy] Litterbox upload failed:", last_err)
+                except Exception as e:
+                    last_err = str(e)
+                    print("[Proxy] Litterbox upload threw exception:", last_err)
+
+                # Method 2: Try Pixhost (if Litterbox failed)
+                if not public_url:
                     try:
-                        print(f"[Proxy] Uploading to Litterbox (attempt {attempt + 1}/3)...")
+                        print("[Proxy] Litterbox failed. Trying Pixhost...")
+                        pix_boundary = b'----PxHostBoundary' + uuid.uuid4().hex.encode()
+                        pix_body = (
+                            b'--' + pix_boundary + b'\r\n'
+                            b'Content-Disposition: form-data; name="content_type"\r\n\r\n'
+                            b'0\r\n'
+                            b'--' + pix_boundary + b'\r\n' +
+                            (f'Content-Disposition: form-data; name="img"; filename="{img_name}"\r\n'
+                             f'Content-Type: {img_mime}\r\n\r\n').encode() +
+                            img_bytes + b'\r\n' +
+                            b'--' + pix_boundary + b'--\r\n'
+                        )
+                        pix_req = urllib.request.Request(
+                            'https://api.pixhost.to/images',
+                            data=pix_body,
+                            headers={
+                                'Content-Type': f'multipart/form-data; boundary={pix_boundary.decode()}',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            },
+                            method='POST'
+                        )
+                        with urllib.request.urlopen(pix_req, timeout=15) as pr:
+                            import json as _json
+                            res_data = _json.loads(pr.read().decode('utf-8'))
+                        th_url = res_data.get('th_url')
+                        if th_url:
+                            import re
+                            match = re.match(r'https://t(\d+)\.pixhost\.to/thumbs/(.+)', th_url)
+                            if match:
+                                server_num = match.group(1)
+                                path = match.group(2)
+                                public_url = f'https://img{server_num}.pixhost.to/images/{path}'
+                                print("[Proxy] Pixhost upload succeeded:", public_url)
+                            else:
+                                last_err = f"Could not parse Pixhost th_url: {th_url}"
+                                print("[Proxy] Pixhost parse failed:", last_err)
+                        else:
+                            last_err = f"Pixhost API error: {res_data}"
+                            print("[Proxy] Pixhost upload failed:", last_err)
+                    except Exception as e:
+                        last_err = str(e)
+                        print("[Proxy] Pixhost upload threw exception:", last_err)
+
+                # Method 3: Try Catbox (if Pixhost failed)
+                if not public_url:
+                    try:
+                        print("[Proxy] Pixhost failed. Trying Catbox...")
+                        catbox_perm_body = (
+                            b'--' + boundary + b'\r\n'
+                            b'Content-Disposition: form-data; name="reqtype"\r\n\r\n'
+                            b'fileupload\r\n'
+                            b'--' + boundary + b'\r\n' +
+                            (f'Content-Disposition: form-data; name="fileToUpload"; filename="{img_name}"\r\n'
+                             f'Content-Type: {img_mime}\r\n\r\n').encode() +
+                            img_bytes + b'\r\n' +
+                            b'--' + boundary + b'--\r\n'
+                        )
                         catbox_req = urllib.request.Request(
-                            'https://litterbox.catbox.moe/resources/internals/api.php',
-                            data=catbox_body,
+                            'https://catbox.moe/user/api.php',
+                            data=catbox_perm_body,
                             headers={
                                 'Content-Type': f'multipart/form-data; boundary={boundary.decode()}',
                                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                             },
                             method='POST'
                         )
-                        with urllib.request.urlopen(catbox_req, timeout=30) as cr:
+                        with urllib.request.urlopen(catbox_req, timeout=15) as cr:
                             res_text = cr.read().decode('utf-8').strip()
                         if res_text.startswith('https://'):
                             public_url = res_text
-                            break
+                            print("[Proxy] Catbox upload succeeded:", public_url)
                         else:
-                            last_err = f"Litterbox response error: {res_text}"
-                            print(f"[Proxy] Attempt {attempt + 1} failed: {last_err}")
+                            last_err = f"Catbox response error: {res_text}"
+                            print("[Proxy] Catbox upload failed:", last_err)
                     except Exception as e:
                         last_err = str(e)
-                        print(f"[Proxy] Attempt {attempt + 1} failed with exception: {last_err}")
-                    time.sleep(1.5)
+                        print("[Proxy] Catbox upload threw exception:", last_err)
 
                 if not public_url:
-                    raise Exception(f'Litterbox upload failed after 3 attempts. Last error: {last_err}')
+                    raise Exception(f'All file upload methods (Litterbox, Pixhost, Catbox) failed. Last error: {last_err}')
 
-                print("[Proxy] public_url from litterbox:", public_url)
+                print("[Proxy] public_url selected:", public_url)
 
                 # Step 3: POST public URL to Magnific remove-background
                 magnific_body = urllib.parse.urlencode({'image_url': public_url}).encode()
