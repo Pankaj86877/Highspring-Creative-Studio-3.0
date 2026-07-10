@@ -14,8 +14,12 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js"></script>
     
+    <script src="services/magnific.js"></script>
+    <script src="services/existing.js"></script>
+    <script src="services/rembg.js"></script>
+    <script src="services/bgRemoveApi.js"></script>
+    <script src="services/withoutBg.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -3020,16 +3024,39 @@
             <div class="workspace-grid" style="max-width:680px;">
 
                 <!-- Provider Selection -->
-                <div style="margin-bottom:20px;">
-                    <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8899aa;margin-bottom:10px;">Select AI Provider</div>
-                    <div class="bgr-providers">
-                        <div class="bgr-provider-btn">
-                            <input type="radio" id="bgr-provider-existing" name="bgrProvider" value="existing" checked>
-                            <label for="bgr-provider-existing" class="bgr-provider-label">☁️ Remove Background API (Existing)</label>
+                <div style="margin-bottom:20px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <div style="flex: 1;">
+                        <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8899aa;margin-bottom:8px;">Select AI Provider</div>
+                        <select id="bgr-provider-select" style="width:100%; background:rgba(7,41,66,0.6); border:1px solid rgba(45,191,249,0.2); border-radius:8px; padding:10px 12px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:13px; outline:none; cursor:pointer; transition:border-color var(--transition-fast);">
+                            <option value="existing" selected>☁️ Remove Background API (Existing)</option>
+                            <option value="magnific">✨ Magnific API</option>
+                            <option value="rembg">💻 rembg (Local / Open Source)</option>
+                            <option value="bgRemoveApi">🌐 bg-remove-api (REST API)</option>
+                            <option value="withoutBg">⚡ withoutBG (High Quality Open Source)</option>
+                        </select>
+                    </div>
+                    <button id="bgr-settings-toggle-btn" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; height:41px; margin-top:20px; color:var(--color-light-blue); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all var(--transition-fast);" title="Configure Provider Endpoints">
+                        ⚙️
+                    </button>
+                </div>
+
+                <!-- Settings Panel for Self-Hosted Provider Endpoints -->
+                <div id="bgr-settings-panel" style="display: none; background: rgba(7,41,66,0.4); border: 1px solid rgba(45,191,249,0.15); border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                    <div style="font-size:12px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-light-blue); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                        🔧 Self-Hosted Provider Endpoints
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <div>
+                            <label style="font-size:11px; color:#8899aa; display:block; margin-bottom:4px;">rembg Endpoint:</label>
+                            <input type="text" id="bgr-endpoint-rembg" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 8px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="e.g. http://localhost:5000/remove">
                         </div>
-                        <div class="bgr-provider-btn">
-                            <input type="radio" id="bgr-provider-magnific" name="bgrProvider" value="magnific">
-                            <label for="bgr-provider-magnific" class="bgr-provider-label">✨ Magnific API</label>
+                        <div>
+                            <label style="font-size:11px; color:#8899aa; display:block; margin-bottom:4px;">bg-remove-api Endpoint:</label>
+                            <input type="text" id="bgr-endpoint-bg-remove-api" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 8px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="e.g. http://localhost:5001/remove">
+                        </div>
+                        <div>
+                            <label style="font-size:11px; color:#8899aa; display:block; margin-bottom:4px;">withoutBG Endpoint:</label>
+                            <input type="text" id="bgr-endpoint-without-bg" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 8px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="e.g. http://localhost:5002/remove">
                         </div>
                     </div>
                 </div>
@@ -6388,74 +6415,54 @@
             return file;
         }
 
-        async function removeWithMagnific(file) {
-            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
-            statusEl.textContent = 'Uploading to Magnific AI engine…';
+        // Collapsible settings panel toggle
+        const settingsToggleBtn = document.getElementById('bgr-settings-toggle-btn');
+        const settingsPanel = document.getElementById('bgr-settings-panel');
+        settingsToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+        });
 
-            const form = new FormData();
-            form.append('image_file', file);
+        // Bind endpoints to localStorage with defaults
+        const endpointKeys = {
+            'bgr-endpoint-rembg': 'bgr-rembg-endpoint',
+            'bgr-endpoint-bg-remove-api': 'bgr-bg-remove-api-endpoint',
+            'bgr-endpoint-without-bg': 'bgr-without-bg-endpoint'
+        };
 
-            const response = await fetch(`${PROXY_BASE}/api/magnific/bg-remove`, {
-                method: 'POST',
-                body: form
-            });
+        const defaultEndpoints = {
+            'bgr-endpoint-rembg': 'http://localhost:5000/remove',
+            'bgr-endpoint-bg-remove-api': 'http://localhost:5001/remove',
+            'bgr-endpoint-without-bg': 'http://localhost:5002/remove'
+        };
 
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.message || err.error || `HTTP ${response.status}`);
+        Object.keys(endpointKeys).forEach(id => {
+            const input = document.getElementById(id);
+            const lsKey = endpointKeys[id];
+            if (input) {
+                input.value = localStorage.getItem(lsKey) || defaultEndpoints[id];
+                localStorage.setItem(lsKey, input.value); // ensure default is stored
+
+                input.addEventListener('input', () => {
+                    localStorage.setItem(lsKey, input.value.trim());
+                });
             }
+        });
 
-            const resData = await response.json();
-            const imageUrl = resData.high_resolution || resData.url || resData.preview;
-
-            if (!imageUrl) throw new Error('No result image returned from Magnific AI.');
-
-            statusEl.textContent = 'Loading result…';
-
-            const proxiedUrl = `${PROXY_BASE}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-            const imgRes = await fetch(proxiedUrl);
-            if (!imgRes.ok) throw new Error('Failed to load result image from CDN.');
-            return await imgRes.blob();
-        }
-
-        async function removeWithExistingApi(file) {
-            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
-            statusEl.textContent = 'Processing via Remove.bg API…';
-
-            const mode = document.querySelector('input[name="bgrMode"]:checked')?.value || 'auto';
-            const form = new FormData();
-            form.append('image_file', file);
-            form.append('size', 'auto');
-            form.append('type', mode);
-
-            const res = await fetch(`${PROXY_BASE}/api/removebg/bg-remove`, {
-                method: 'POST',
-                body: form
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                const errMsg = err.errors?.[0]?.title || err.error || `HTTP ${res.status}`;
-                throw new Error(errMsg);
-            }
-
-            return await res.blob();
-        }
-
+        // Provider registry using modular loaded services
         const providers = {
-            magnific: removeWithMagnific,
-            existing: removeWithExistingApi
+            magnific: (file, status) => window.BackgroundServices.magnific(file, status),
+            existing: (file, status) => window.BackgroundServices.existing(file, status),
+            rembg: (file, status) => window.BackgroundServices.rembg(file, status),
+            bgRemoveApi: (file, status) => window.BackgroundServices.bgRemoveApi(file, status),
+            withoutBg: (file, status) => window.BackgroundServices.withoutBg(file, status)
         };
 
         async function processBackgroundRemoval(file) {
-            const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
-            switch (selectedProvider) {
-                case "magnific":
-                    return await removeWithMagnific(file);
-                case "existing":
-                default:
-                    return await removeWithExistingApi(file);
-            }
+            const selectEl = document.getElementById('bgr-provider-select');
+            const selectedProvider = selectEl ? selectEl.value : 'existing';
+            const providerFn = providers[selectedProvider] || providers.existing;
+            return await providerFn(file, statusEl);
         }
 
         processBtn.addEventListener('click', async () => {
