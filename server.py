@@ -4,6 +4,7 @@ import urllib.request
 import urllib.parse
 import json
 import sys
+import socket
 
 PORT = 8888
 API_KEY = "MS2b105d363a4f4971844d5a2bbd030437"
@@ -385,9 +386,15 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, str(e))
 
+class DualStackTCPServer(socketserver.TCPServer):
+    address_family = socket.AF_INET6
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        super().server_bind()
+
 if __name__ == '__main__':
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), ProxyHTTPRequestHandler) as httpd:
+    with DualStackTCPServer(("", PORT), ProxyHTTPRequestHandler) as httpd:
         print(f"Magnific Proxy Dev Server running at http://localhost:{PORT}")
         try:
             httpd.serve_forever()
