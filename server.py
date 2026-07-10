@@ -120,7 +120,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 # Step 2: Upload to Litterbox (Catbox) to get a public URL
-                import io, uuid
+                import io, uuid, time, traceback
                 boundary = b'----PxBoundary' + uuid.uuid4().hex.encode()
                 catbox_body = (
                     b'--' + boundary + b'\r\n'
@@ -135,22 +135,38 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     img_bytes + b'\r\n' +
                     b'--' + boundary + b'--\r\n'
                 )
-                catbox_req = urllib.request.Request(
-                    'https://litterbox.catbox.moe/resources/internals/api.php',
-                    data=catbox_body,
-                    headers={
-                        'Content-Type': f'multipart/form-data; boundary={boundary.decode()}',
-                        'User-Agent': 'Mozilla/5.0'
-                    },
-                    method='POST'
-                )
-                with urllib.request.urlopen(catbox_req, timeout=60) as cr:
-                    public_url = cr.read().decode('utf-8').strip()
+
+                public_url = None
+                last_err = None
+                for attempt in range(3):
+                    try:
+                        print(f"[Proxy] Uploading to Litterbox (attempt {attempt + 1}/3)...")
+                        catbox_req = urllib.request.Request(
+                            'https://litterbox.catbox.moe/resources/internals/api.php',
+                            data=catbox_body,
+                            headers={
+                                'Content-Type': f'multipart/form-data; boundary={boundary.decode()}',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                            },
+                            method='POST'
+                        )
+                        with urllib.request.urlopen(catbox_req, timeout=30) as cr:
+                            res_text = cr.read().decode('utf-8').strip()
+                        if res_text.startswith('https://'):
+                            public_url = res_text
+                            break
+                        else:
+                            last_err = f"Litterbox response error: {res_text}"
+                            print(f"[Proxy] Attempt {attempt + 1} failed: {last_err}")
+                    except Exception as e:
+                        last_err = str(e)
+                        print(f"[Proxy] Attempt {attempt + 1} failed with exception: {last_err}")
+                    time.sleep(1.5)
+
+                if not public_url:
+                    raise Exception(f'Litterbox upload failed after 3 attempts. Last error: {last_err}')
 
                 print("[Proxy] public_url from litterbox:", public_url)
-
-                if not public_url.startswith('https://'):
-                    raise Exception(f'Litterbox upload failed: {public_url}')
 
                 # Step 3: POST public URL to Magnific remove-background
                 magnific_body = urllib.parse.urlencode({'image_url': public_url}).encode()
@@ -172,11 +188,15 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(result)
 
             except urllib.error.HTTPError as e:
+                print(f"[Proxy] HTTPError {e.code} from Magnific/Litterbox:")
+                traceback.print_exc()
                 self.send_response(e.code)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(e.read())
             except Exception as e:
+                print("[Proxy] Exception in bg-remove handler:")
+                traceback.print_exc()
                 import json as _json
                 self.send_response(500)
                 self.send_header('Content-Type', 'application/json')
