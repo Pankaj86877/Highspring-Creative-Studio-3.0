@@ -322,53 +322,6 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(_json.dumps({'error': str(e)}).encode())
-        elif parsed_url.path == '/api/proxy-post':
-            query_params = urllib.parse.parse_qs(parsed_url.query)
-            target_url = query_params.get('url', [''])[0]
-            if not target_url:
-                self.send_response(400)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(b'{"error": "Missing url parameter"}')
-                return
-
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-
-            try:
-                print(f"[Proxy] Proxying POST request to custom endpoint: {target_url}")
-                req = urllib.request.Request(
-                    target_url,
-                    data=post_data,
-                    headers={
-                        'Content-Type': self.headers.get('Content-Type', '')
-                    },
-                    method='POST'
-                )
-                with urllib.request.urlopen(req, timeout=60) as response:
-                    self.send_response(response.status)
-                    for key, val in response.getheaders():
-                        if key.lower() not in ['content-encoding', 'transfer-encoding', 'connection', 'access-control-allow-origin']:
-                            self.send_header(key, val)
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.send_header('Access-Control-Allow-Private-Network', 'true')
-                    self.end_headers()
-                    self.wfile.write(response.read())
-            except urllib.error.HTTPError as e:
-                print(f"[Proxy] HTTPError {e.code} from custom endpoint:")
-                traceback.print_exc()
-                self.send_response(e.code)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(e.read())
-            except Exception as e:
-                print("[Proxy] Exception in custom endpoint proxy handler:")
-                traceback.print_exc()
-                import json as _json
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(_json.dumps({'error': str(e)}).encode())
         else:
             super().do_POST()
 
