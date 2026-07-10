@@ -695,6 +695,38 @@
             border-color: var(--color-light-blue);
             color: var(--color-light-blue);
         }
+        #section-bg-remover .bgr-providers {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #section-bg-remover .bgr-provider-btn {
+            position: relative;
+        }
+        #section-bg-remover .bgr-provider-btn input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+        #section-bg-remover .bgr-provider-label {
+            display: block;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 11px 12px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #8899aa;
+            transition: all 0.2s;
+        }
+        #section-bg-remover .bgr-provider-btn input:checked + .bgr-provider-label {
+            background: rgba(45,191,249,0.12);
+            border-color: var(--color-light-blue);
+            color: var(--color-light-blue);
+        }
         #section-bg-remover .bgr-actions { display: flex; flex-direction: column; gap: 10px; }
         #section-bg-remover .bgr-btn-process {
             width: 100%;
@@ -2986,6 +3018,21 @@
             </div>
 
             <div class="workspace-grid" style="max-width:680px;">
+
+                <!-- Provider Selection -->
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8899aa;margin-bottom:10px;">Select AI Provider</div>
+                    <div class="bgr-providers">
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-existing" name="bgrProvider" value="existing" checked>
+                            <label for="bgr-provider-existing" class="bgr-provider-label">☁️ Remove Background API (Existing)</label>
+                        </div>
+                        <div class="bgr-provider-btn">
+                            <input type="radio" id="bgr-provider-magnific" name="bgrProvider" value="magnific">
+                            <label for="bgr-provider-magnific" class="bgr-provider-label">✨ Magnific API</label>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Upload Drop Zone -->
                 <div class="bgr-upload-area" id="bgr-drop-zone" onclick="document.getElementById('bgr-file-input').click()">
@@ -6341,13 +6388,82 @@
             return file;
         }
 
+        async function removeWithMagnific(file) {
+            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://127.0.0.1:8888';
+            statusEl.textContent = 'Uploading to Magnific AI engine…';
+
+            const form = new FormData();
+            form.append('image_file', file);
+
+            const response = await fetch(`${PROXY_BASE}/api/magnific/bg-remove`, {
+                method: 'POST',
+                body: form
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.message || err.error || `HTTP ${response.status}`);
+            }
+
+            const resData = await response.json();
+            const imageUrl = resData.high_resolution || resData.url || resData.preview;
+
+            if (!imageUrl) throw new Error('No result image returned from Magnific AI.');
+
+            statusEl.textContent = 'Loading result…';
+
+            const proxiedUrl = `${PROXY_BASE}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+            const imgRes = await fetch(proxiedUrl);
+            if (!imgRes.ok) throw new Error('Failed to load result image from CDN.');
+            return await imgRes.blob();
+        }
+
+        async function removeWithExistingApi(file) {
+            const BGRemover_API_KEY = 'cLGBSpgEQDGD8jR8k5XBVKGR';
+            statusEl.textContent = 'Processing via Remove.bg API…';
+
+            const mode = document.querySelector('input[name="bgrMode"]:checked')?.value || 'auto';
+            const form = new FormData();
+            form.append('image_file', file);
+            form.append('size', 'auto');
+            form.append('type', mode);
+
+            const res = await fetch('https://api.remove.bg/v1.0/removebg', {
+                method: 'POST',
+                headers: { 'X-Api-Key': BGRemover_API_KEY },
+                body: form
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                const errMsg = err.errors?.[0]?.title || `HTTP ${res.status}`;
+                throw new Error(errMsg);
+            }
+
+            return await res.blob();
+        }
+
+        const providers = {
+            magnific: removeWithMagnific,
+            existing: removeWithExistingApi
+        };
+
+        async function processBackgroundRemoval(file) {
+            const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
+            switch (selectedProvider) {
+                case "magnific":
+                    return await removeWithMagnific(file);
+                case "existing":
+                default:
+                    return await removeWithExistingApi(file);
+            }
+        }
+
         processBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://127.0.0.1:8888';
-
             statusEl.style.color = 'var(--color-light-blue)';
-            statusEl.textContent = 'Processing via Magnific AI engine… please wait…';
+            statusEl.textContent = 'Processing background removal… please wait…';
             processBtn.disabled = true;
             downloadBtn.style.display = 'none';
             downloadSvgBtn.style.display = 'none';
@@ -6357,34 +6473,8 @@
                 // Convert AVIF to PNG transparently if needed
                 const fileToSend = await ensureSupportedFile(selectedFile);
 
-                // Send file as multipart FormData — Magnific requires image_file as binary
-                const form = new FormData();
-                form.append('image_file', fileToSend);
-
-                const response = await fetch(`${PROXY_BASE}/api/magnific/bg-remove`, {
-                    method: 'POST',
-                    body: form
-                });
-
-                if (!response.ok) {
-                    const err = await response.json().catch(() => ({}));
-                    throw new Error(err.message || err.error || `HTTP ${response.status}`);
-                }
-
-                // Response is synchronous — returns { url, high_resolution, preview, original }
-                const resData = await response.json();
-                const imageUrl = resData.high_resolution || resData.url || resData.preview;
-
-                if (!imageUrl) throw new Error('No result image returned from Magnific AI.');
-
-                statusEl.textContent = 'Loading result…';
-
-                // Proxy the CDN image to avoid CORS
-                const proxiedUrl = `${PROXY_BASE}/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-
-                const imgRes = await fetch(proxiedUrl);
-                if (!imgRes.ok) throw new Error('Failed to load result image from CDN.');
-                const blob = await imgRes.blob();
+                // Call the dispatcher to remove the background
+                const blob = await processBackgroundRemoval(fileToSend);
                 const blobUrl = URL.createObjectURL(blob);
 
                 _currentResultBlob = blob;
