@@ -5,6 +5,7 @@ import urllib.parse
 import json
 import sys
 import socket
+import os
 
 PORT = 8888
 API_KEY = "MS2b105d363a4f4971844d5a2bbd030437"
@@ -294,7 +295,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     data=post_data,
                     headers={
                         'Content-Type': self.headers.get('Content-Type', ''),
-                        'X-Api-Key': 'cLGBSpgEQDGD8jR8k5XBVKGR'
+                        'X-Api-Key': os.environ.get('REMOVE_BG_API_KEY', 'cLGBSpgEQDGD8jR8k5XBVKGR')
                     },
                     method='POST'
                 )

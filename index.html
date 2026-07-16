@@ -6967,9 +6967,6 @@
 
         async function processBackgroundRemoval(file) {
             const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
-            if (selectedProvider !== 'browserAi' && !isLocal) {
-                throw new Error("This provider requires a local server. Please select 'Free Browser AI' or run the application locally at http://localhost:8888.");
-            }
             const providerFn = providers[selectedProvider] || providers.existing;
             return await providerFn(file, statusEl);
         }
