@@ -6864,6 +6864,22 @@
         const downloadSvgBtn = document.getElementById('bgr-download-svg-btn');
         const statusEl       = document.getElementById('bgr-status');
 
+        // Auto-select Free Browser AI if running remotely (to prevent Mixed Content "Failed to fetch" block on localhost proxy)
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (!isLocal) {
+            const browserAiRadio = document.getElementById('bgr-provider-browserai');
+            const existingRadio = document.getElementById('bgr-provider-existing');
+            if (browserAiRadio && existingRadio) {
+                existingRadio.checked = false;
+                browserAiRadio.checked = true;
+            }
+            // Add helpful badge "(Local Server Req.)" to labels
+            const localLabels = document.querySelectorAll('#bgr-provider-existing + label, #bgr-provider-magnific + label');
+            localLabels.forEach(lbl => {
+                lbl.innerHTML += ' <span style="font-size: 8px; color: var(--color-orange); opacity: 0.85; margin-left: 4px;">(Local Server Req.)</span>';
+            });
+        }
+
         let _currentResultBlob = null;
 
         let selectedFile = null;
@@ -6951,6 +6967,9 @@
 
         async function processBackgroundRemoval(file) {
             const selectedProvider = document.querySelector('input[name="bgrProvider"]:checked')?.value || 'existing';
+            if (selectedProvider !== 'browserAi' && !isLocal) {
+                throw new Error("This provider requires a local server. Please select 'Free Browser AI' or run the application locally at http://localhost:8888.");
+            }
             const providerFn = providers[selectedProvider] || providers.existing;
             return await providerFn(file, statusEl);
         }
@@ -6989,7 +7008,11 @@
 
             } catch (e) {
                 statusEl.style.color = 'var(--color-orange)';
-                statusEl.textContent = 'Error: ' + e.message;
+                if (e.message && e.message.includes('Failed to fetch')) {
+                    statusEl.textContent = 'Error: Failed to fetch from local server. Please make sure server.py is running locally, or use the "Free Browser AI" provider.';
+                } else {
+                    statusEl.textContent = 'Error: ' + e.message;
+                }
                 console.error(e);
             } finally {
                 processBtn.disabled = false;
