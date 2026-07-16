@@ -1297,6 +1297,38 @@
         .tool-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 28px; align-items: start; }
         @media (max-width: 1000px) { .tool-layout { grid-template-columns: 1fr; } }
 
+        /* Format Converter Tabs & Batch Queue Styles */
+        .fmt-mode-tabs .nav-btn {
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.02);
+            color: rgba(255,255,255,0.6);
+            transition: all var(--transition-fast);
+        }
+        .fmt-mode-tabs .nav-btn.active {
+            background: var(--color-orange);
+            border-color: var(--color-orange);
+            color: var(--color-white);
+            box-shadow: 0 0 12px rgba(249,92,21,0.4);
+        }
+        .fmt-file-status {
+            font-size: 10px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .fmt-file-status.pending { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+        .fmt-file-status.converting { background: rgba(249,92,21,0.15); color: var(--color-orange); animation: fmtPulse 1s infinite alternate; }
+        .fmt-file-status.done { background: rgba(67,224,152,0.15); color: var(--color-green); }
+        .fmt-file-status.error { background: rgba(255,0,0,0.15); color: #ff4a4a; }
+        
+        @keyframes fmtPulse {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
+        }
+
         .dz-upload-zone {
             border: 2px dashed rgba(45,191,249,0.3); border-radius: 14px;
             padding: 32px 20px; text-align: center; cursor: pointer;
@@ -2798,30 +2830,56 @@
             <div class="section-page-header">
                 <h1>Format Converter</h1>
                 <p>Convert images between JPG · PNG · WEBP with optional resize and quality control</p>
+                
+                <!-- Mode Tabs -->
+                <div class="fmt-mode-tabs" style="display:flex;gap:10px;margin-top:16px;justify-content:center;">
+                    <button class="nav-btn active" id="fmt-tab-single" style="border:1px solid rgba(255,255,255,0.1);padding:6px 16px;border-radius:20px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;">👤 Single File</button>
+                    <button class="nav-btn" id="fmt-tab-batch" style="border:1px solid rgba(255,255,255,0.1);padding:6px 16px;border-radius:20px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;">👥 Batch Mode</button>
+                </div>
             </div>
 
             <div class="tool-layout">
 
                 <div class="shape-card" style="gap:0;">
                     <div class="card-header" style="margin-bottom:16px;">
-                        <span class="card-title" style="color:var(--color-orange);">Source Image</span>
+                        <span class="card-title" style="color:var(--color-orange);" id="fmt-left-card-title">Source Image</span>
                         <span class="dim-badge" id="fmt-src-dims">—</span>
                     </div>
 
-                    <div class="dz-upload-zone" id="fmt-dz-zone" style="border-color:rgba(249,92,21,0.3);">
-                        <span class="dz-icon">🖼</span>
-                        <div class="dz-label">Drop an image or click to browse</div>
-                        <div class="dz-sublabel">JPG · PNG · WEBP · GIF · BMP</div>
-                        <input type="file" id="fmt-file-input" accept="image/*">
+                    <!-- Single Mode Container -->
+                    <div id="fmt-single-container" style="display: block;">
+                        <div class="dz-upload-zone" id="fmt-dz-zone" style="border-color:rgba(249,92,21,0.3);">
+                            <span class="dz-icon">🖼</span>
+                            <div class="dz-label">Drop an image or click to browse</div>
+                            <div class="dz-sublabel">JPG · PNG · WEBP · GIF · BMP</div>
+                            <input type="file" id="fmt-file-input" accept="image/*">
+                        </div>
+
+                        <div class="format-preview-grid" style="grid-template-columns:1fr;margin-top:16px;">
+                            <div class="format-preview-panel">
+                                <div class="format-preview-label" style="color:rgba(249,92,21,0.8);">Original</div>
+                                <div class="format-preview-img-wrap" id="fmt-src-wrap">
+                                    <span class="format-empty-state">Upload to preview</span>
+                                </div>
+                                <div class="format-preview-meta" id="fmt-src-meta"></div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="format-preview-grid" style="grid-template-columns:1fr;margin-top:16px;">
-                        <div class="format-preview-panel">
-                            <div class="format-preview-label" style="color:rgba(249,92,21,0.8);">Original</div>
-                            <div class="format-preview-img-wrap" id="fmt-src-wrap">
-                                <span class="format-empty-state">Upload to preview</span>
-                            </div>
-                            <div class="format-preview-meta" id="fmt-src-meta"></div>
+                    <!-- Batch Mode Container -->
+                    <div id="fmt-batch-container" style="display: none; flex-direction: column;">
+                        <div class="dz-upload-zone" id="fmt-batch-dz-zone" style="border-color:rgba(249,92,21,0.3);">
+                            <span class="dz-icon">📥</span>
+                            <div class="dz-label">Drop multiple images or click to browse</div>
+                            <div class="dz-sublabel">Batch Mode · JPG · PNG · WEBP · GIF · BMP</div>
+                            <input type="file" id="fmt-batch-file-input" accept="image/*" multiple>
+                        </div>
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px; margin-bottom:10px;">
+                            <span class="card-title" style="font-size:12px; color:rgba(232,240,242,0.6);">File Queue (<span id="fmt-queue-count">0</span>)</span>
+                        </div>
+                        <div class="file-list" id="fmt-batch-queue" style="max-height: 280px; overflow-y: auto;">
+                            <!-- Queue items populated by JS -->
                         </div>
                     </div>
                 </div>
@@ -2883,7 +2941,8 @@
                         </div>
                     </div>
 
-                    <div style="margin-top:16px;">
+                    <!-- Single Mode Output Preview -->
+                    <div style="margin-top:16px;" id="fmt-single-preview-wrap">
                         <div class="format-preview-panel">
                             <div class="format-preview-label" style="color:rgba(45,191,249,0.8);">Output Preview</div>
                             <div class="format-preview-img-wrap" id="fmt-out-wrap">
@@ -2897,12 +2956,29 @@
                         <div class="progress-bar-wrap" id="fmt-progress-wrap">
                             <div class="progress-bar-fill" id="fmt-progress-fill"></div>
                         </div>
-                        <button class="btn-export" id="fmt-convert-btn" style="background:var(--color-orange);margin-top:14px;" disabled>
-                            ⬇ Convert &amp; Download
-                        </button>
-                        <button class="btn-toggle-action" id="fmt-clear-btn" style="width:100%;margin-top:10px;background:rgba(249,92,21,0.1);color:var(--color-orange);border-color:rgba(249,92,21,0.3);">
-                            ✕ Clear
-                        </button>
+                        
+                        <!-- Single Mode Action Buttons -->
+                        <div id="fmt-single-actions" style="display: block;">
+                            <button class="btn-export" id="fmt-convert-btn" style="background:var(--color-orange);margin-top:14px;" disabled>
+                                ⬇ Convert &amp; Download
+                            </button>
+                            <button class="btn-toggle-action" id="fmt-clear-btn" style="width:100%;margin-top:10px;background:rgba(249,92,21,0.1);color:var(--color-orange);border-color:rgba(249,92,21,0.3);">
+                                ✕ Clear
+                            </button>
+                        </div>
+                        
+                        <!-- Batch Mode Action Buttons -->
+                        <div id="fmt-batch-actions" style="display: none; flex-direction: column; gap: 10px; margin-top: 14px;">
+                            <button class="btn-export" id="fmt-batch-convert-btn" style="background:var(--color-orange);" disabled>
+                                ⚡ Start Batch Conversion
+                            </button>
+                            <button class="btn-export" id="fmt-batch-zip-btn" style="background:var(--color-green);" disabled>
+                                🎁 Download All (.zip)
+                            </button>
+                            <button class="btn-toggle-action" id="fmt-batch-clear-btn" style="width:100%;background:rgba(249,92,21,0.1);color:var(--color-orange);border-color:rgba(249,92,21,0.3);">
+                                ✕ Clear Queue
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -5194,11 +5270,16 @@
 
     class FormatConverterStudio {
         constructor() {
+            window.formatConverterStudio = this;
             this.imgData = null;
             this.img = null;
             this.fileExt = null;
             this.outFormat = 'image/png';
             this.outExt = 'png';
+            
+            this.currentMode = 'single';
+            this.batchFiles = [];
+            
             this.initDOM();
             this.initEvents();
         }
@@ -5231,9 +5312,35 @@
             
             this.progressWrap = document.getElementById('fmt-progress-wrap');
             this.progressFill = document.getElementById('fmt-progress-fill');
+
+            // Batch mode elements
+            this.tabSingle = document.getElementById('fmt-tab-single');
+            this.tabBatch = document.getElementById('fmt-tab-batch');
+            
+            this.leftCardTitle = document.getElementById('fmt-left-card-title');
+            this.singleContainer = document.getElementById('fmt-single-container');
+            this.batchContainer = document.getElementById('fmt-batch-container');
+            
+            this.batchDzZone = document.getElementById('fmt-batch-dz-zone');
+            this.batchFileInput = document.getElementById('fmt-batch-file-input');
+            this.batchQueue = document.getElementById('fmt-batch-queue');
+            this.queueCount = document.getElementById('fmt-queue-count');
+            
+            this.singlePreviewWrap = document.getElementById('fmt-single-preview-wrap');
+            this.singleActions = document.getElementById('fmt-single-actions');
+            this.batchActions = document.getElementById('fmt-batch-actions');
+            
+            this.btnBatchConvert = document.getElementById('fmt-batch-convert-btn');
+            this.btnBatchZip = document.getElementById('fmt-batch-zip-btn');
+            this.btnBatchClear = document.getElementById('fmt-batch-clear-btn');
         }
 
         initEvents() {
+            // Mode switching tabs
+            this.tabSingle.addEventListener('click', () => this.switchMode('single'));
+            this.tabBatch.addEventListener('click', () => this.switchMode('batch'));
+
+            // Single mode drop zone
             this.dzZone.addEventListener('dragover', e => { e.preventDefault(); this.dzZone.classList.add('drag-over'); });
             this.dzZone.addEventListener('dragleave', () => this.dzZone.classList.remove('drag-over'));
             this.dzZone.addEventListener('drop', e => {
@@ -5243,6 +5350,18 @@
             });
             this.fileInput.addEventListener('change', e => {
                 if(e.target.files[0]) this.handleFile(e.target.files[0]);
+            });
+
+            // Batch mode drop zone
+            this.batchDzZone.addEventListener('dragover', e => { e.preventDefault(); this.batchDzZone.classList.add('drag-over'); });
+            this.batchDzZone.addEventListener('dragleave', () => this.batchDzZone.classList.remove('drag-over'));
+            this.batchDzZone.addEventListener('drop', e => {
+                e.preventDefault();
+                this.batchDzZone.classList.remove('drag-over');
+                if(e.dataTransfer.files) this.addBatchFiles(e.dataTransfer.files);
+            });
+            this.batchFileInput.addEventListener('change', e => {
+                if(e.target.files) this.addBatchFiles(e.target.files);
             });
 
             this.fmtBtns.forEach(btn => {
@@ -5270,6 +5389,60 @@
 
             this.btnClear.addEventListener('click', () => this.clearAll());
             this.btnConvert.addEventListener('click', () => this.convertAndDownload());
+
+            this.btnBatchConvert.addEventListener('click', () => this.startBatchConversion());
+            this.btnBatchZip.addEventListener('click', () => this.downloadBatchZip());
+            this.btnBatchClear.addEventListener('click', () => this.clearBatch());
+        }
+
+        switchMode(mode) {
+            this.currentMode = mode;
+            if (mode === 'single') {
+                this.tabSingle.classList.add('active');
+                this.tabBatch.classList.remove('active');
+                this.leftCardTitle.textContent = 'Source Image';
+                this.singleContainer.style.display = 'block';
+                this.batchContainer.style.display = 'none';
+                this.singlePreviewWrap.style.display = 'block';
+                this.singleActions.style.display = 'block';
+                this.batchActions.style.display = 'none';
+                
+                if (this.img) {
+                    this.srcDims.textContent = `${this.img.width} × ${this.img.height} px`;
+                    this.btnConvert.disabled = false;
+                } else {
+                    this.srcDims.textContent = '—';
+                    this.btnConvert.disabled = true;
+                }
+                
+                if (this.fileExt === 'png' || (this.fileInput.files[0] && this.fileInput.files[0].type === 'image/png')) {
+                    if (this.btnSvg) this.btnSvg.style.display = 'block';
+                    if (this.fmtBtnsContainer) this.fmtBtnsContainer.style.gridTemplateColumns = 'repeat(4, 1fr)';
+                } else {
+                    if (this.btnSvg) this.btnSvg.style.display = 'none';
+                    if (this.fmtBtnsContainer) this.fmtBtnsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+                }
+            } else {
+                this.tabSingle.classList.remove('active');
+                this.tabBatch.classList.add('active');
+                this.leftCardTitle.textContent = 'Batch Workspace';
+                this.singleContainer.style.display = 'none';
+                this.batchContainer.style.display = 'flex';
+                this.singlePreviewWrap.style.display = 'none';
+                this.singleActions.style.display = 'none';
+                this.batchActions.style.display = 'flex';
+                
+                this.srcDims.textContent = '—';
+                
+                if (this.btnSvg) this.btnSvg.style.display = 'none';
+                if (this.fmtBtnsContainer) this.fmtBtnsContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+                if (this.outFormat === 'image/svg+xml') {
+                    this.fmtBtns.forEach(b => b.classList.remove('active'));
+                    this.fmtBtns[1].classList.add('active'); 
+                    this.outFormat = 'image/png';
+                    this.outExt = 'png';
+                }
+            }
         }
 
         handleFile(file) {
@@ -5312,6 +5485,135 @@
             reader.readAsDataURL(file);
         }
 
+        addBatchFiles(files) {
+            for (let file of files) {
+                if (!file.type.startsWith('image/')) continue;
+                
+                const id = `fmt-file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const item = {
+                    file: file,
+                    id: id,
+                    status: 'pending',
+                    resultBlob: null,
+                    resultName: null,
+                    thumbUrl: URL.createObjectURL(file)
+                };
+                
+                this.batchFiles.push(item);
+                
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.id = id;
+                fileItem.innerHTML = `
+                    <img class="file-item-thumb" src="${item.thumbUrl}">
+                    <div class="file-item-info">
+                        <div class="file-item-name" title="${file.name}">${file.name}</div>
+                        <div class="file-item-size">${(file.size / 1024).toFixed(1)} KB | ${file.type.split('/').pop().toUpperCase()}</div>
+                    </div>
+                    <span class="fmt-file-status pending" id="status-${id}">Pending</span>
+                    <button class="fmt-file-dl-btn" id="dl-${id}" style="background:none; border:none; color:var(--color-green); cursor:pointer; font-size:14px; padding:4px; display:none;" title="Download converted file">⬇</button>
+                    <button class="file-item-remove" onclick="window.formatConverterStudio.removeBatchFile('${id}')">✕</button>
+                `;
+                this.batchQueue.appendChild(fileItem);
+            }
+            this.updateBatchUI();
+        }
+
+        removeBatchFile(id) {
+            const index = this.batchFiles.findIndex(item => item.id === id);
+            if (index > -1) {
+                const item = this.batchFiles[index];
+                if (item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
+                this.batchFiles.splice(index, 1);
+            }
+            const el = document.getElementById(id);
+            if (el) el.remove();
+            this.updateBatchUI();
+        }
+
+        updateBatchUI() {
+            this.queueCount.textContent = this.batchFiles.length;
+            this.btnBatchConvert.disabled = this.batchFiles.length === 0;
+            const hasDone = this.batchFiles.some(item => item.status === 'done');
+            this.btnBatchZip.disabled = !hasDone;
+        }
+
+        fileToDataUrl(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        loadImage(src) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = src;
+            });
+        }
+
+        async convertFile(file, format, quality) {
+            const targetWInput = parseInt(this.resizeW.value) || null;
+            const targetHInput = parseInt(this.resizeH.value) || null;
+            const bgColorValue = this.bgColor.value;
+
+            const dataUrl = await this.fileToDataUrl(file);
+            const img = await this.loadImage(dataUrl);
+
+            let targetW = targetWInput || img.width;
+            let targetH = targetHInput || img.height;
+
+            if (this.lockAR.checked) {
+                if (targetWInput && !targetHInput) {
+                    targetH = Math.round((targetWInput / img.width) * img.height);
+                } else if (targetHInput && !targetWInput) {
+                    targetW = Math.round((targetHInput / img.height) * img.width);
+                }
+            }
+
+            if (format === 'image/svg+xml') {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = targetW;
+                canvas.height = targetH;
+                ctx.drawImage(img, 0, 0, targetW, targetH);
+                const imgd = ctx.getImageData(0, 0, targetW, targetH);
+
+                const options = { ltice: 'containment', qtres: 1, pathomit: 4, colorsampling: 1, numberofcolors: 16 };
+                if (targetW * targetH > 1500000) {
+                    options.numberofcolors = 8;
+                    options.pathomit = 8;
+                }
+                
+                const svgString = window.ImageTracer ? ImageTracer.imagedataToSVG(imgd, options) : '';
+                if (!svgString) throw new Error("Vector tracing failed.");
+                return new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            } else {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = targetW;
+                canvas.height = targetH;
+
+                if (format === 'image/jpeg') {
+                    ctx.fillStyle = bgColorValue;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, targetW, targetH);
+
+                return new Promise((resolve, reject) => {
+                    canvas.toBlob(blob => {
+                        if (blob) resolve(blob);
+                        else reject(new Error("Canvas conversion failed."));
+                    }, format, quality);
+                });
+            }
+        }
+
         updatePreviewContext() {
             if (!this.img) return;
             const canvas = document.createElement('canvas');
@@ -5352,6 +5654,9 @@
 
         async convertAndDownload() {
             if (!this.img) return;
+            const file = this.fileInput.files[0];
+            if (!file) return;
+
             this.btnConvert.disabled = true;
             this.progressWrap.style.display = 'block';
             this.progressFill.style.width = '30%';
@@ -5361,73 +5666,27 @@
 
             await new Promise(r => setTimeout(r, 50));
 
-            const targetW = parseInt(this.resizeW.value) || this.img.width;
-            const targetH = parseInt(this.resizeH.value) || this.img.height;
-
-            if (this.outFormat === 'image/svg+xml') {
-                this.statusChip.textContent = 'Tracing Paths...';
-                this.progressFill.style.width = '60%';
-                
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = targetW;
-                canvas.height = targetH;
-                ctx.drawImage(this.img, 0, 0, targetW, targetH);
-                
-                const imgd = ctx.getImageData(0, 0, targetW, targetH);
-                
-                const options = { ltice: 'containment', qtres: 1, pathomit: 4, colorsampling: 1, numberofcolors: 16 };
-                if (targetW * targetH > 1500000) {
-                    options.numberofcolors = 8;
-                    options.pathomit = 8;
-                }
-                
-                const svgString = window.ImageTracer ? ImageTracer.imagedataToSVG(imgd, options) : '';
-                this.progressFill.style.width = '100%';
-
-                if (svgString) {
-                    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.download = `Highspring_Vector_${targetW}x${targetH}.svg`;
-                    link.href = url;
-                    link.click();
-                    URL.revokeObjectURL(url);
-                    this.statusChip.className = 'status-chip success';
-                    this.statusChip.textContent = 'Done';
-                } else {
-                    alert("Vector Engine mapping failed or asset is too complex.");
-                    this.statusChip.className = 'status-chip idle';
-                    this.statusChip.textContent = 'Error';
-                }
-            } else {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = targetW;
-                canvas.height = targetH;
-
-                if (this.outFormat === 'image/jpeg') {
-                    ctx.fillStyle = this.bgColor.value;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-
-                this.progressFill.style.width = '60%';
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(this.img, 0, 0, targetW, targetH);
-
+            try {
                 const quality = parseInt(this.qualityRange.value) / 100;
-                const dataUrl = canvas.toDataURL(this.outFormat, quality);
+                const blob = await this.convertFile(file, this.outFormat, quality);
                 
                 this.progressFill.style.width = '100%';
 
+                const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.download = `Highspring_FormatConvert_${targetW}x${targetH}.${this.outExt}`;
-                link.href = dataUrl;
+                const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                link.download = `${baseName}.${this.outExt}`;
+                link.href = url;
                 link.click();
+                URL.revokeObjectURL(url);
 
                 this.statusChip.className = 'status-chip success';
                 this.statusChip.textContent = 'Done';
+            } catch (err) {
+                console.error(err);
+                alert("Conversion failed: " + err.message);
+                this.statusChip.className = 'status-chip idle';
+                this.statusChip.textContent = 'Error';
             }
 
             setTimeout(() => {
@@ -5437,6 +5696,174 @@
                 this.statusChip.className = 'status-chip idle';
                 this.statusChip.textContent = 'Ready';
             }, 1500);
+        }
+
+        async startBatchConversion() {
+            if (this.batchFiles.length === 0) return;
+            
+            this.btnBatchConvert.disabled = true;
+            this.btnBatchClear.disabled = true;
+            this.fmtBtns.forEach(btn => btn.disabled = true);
+            this.qualityRange.disabled = true;
+            this.resizeW.disabled = true;
+            this.resizeH.disabled = true;
+            this.lockAR.disabled = true;
+            this.bgColor.disabled = true;
+
+            this.statusChip.className = 'status-chip processing';
+            this.statusChip.textContent = 'Converting...';
+            this.progressWrap.style.display = 'block';
+            this.progressFill.style.width = '5%';
+
+            const usedNames = new Set();
+            const limit = 2; // process 2 at a time
+            let index = 0;
+            let completedCount = 0;
+            const total = this.batchFiles.length;
+
+            const processNext = async () => {
+                if (index >= total) return;
+                const currentIdx = index++;
+                const item = this.batchFiles[currentIdx];
+
+                try {
+                    await this.convertBatchItem(item, usedNames);
+                } catch (err) {
+                    console.error("Batch item conversion error:", err);
+                }
+
+                completedCount++;
+                const pct = Math.round((completedCount / total) * 100);
+                this.progressFill.style.width = `${pct}%`;
+
+                await processNext();
+            };
+
+            const workers = [];
+            const spawnCount = Math.min(limit, total);
+            for (let i = 0; i < spawnCount; i++) {
+                workers.push(processNext());
+            }
+
+            await Promise.all(workers);
+
+            this.statusChip.className = 'status-chip success';
+            this.statusChip.textContent = 'Done';
+            this.progressFill.style.width = '100%';
+
+            this.btnBatchClear.disabled = false;
+            this.fmtBtns.forEach(btn => btn.disabled = false);
+            this.qualityRange.disabled = false;
+            this.resizeW.disabled = false;
+            this.resizeH.disabled = false;
+            this.lockAR.disabled = false;
+            this.bgColor.disabled = false;
+
+            this.updateBatchUI();
+
+            setTimeout(() => {
+                this.progressWrap.style.display = 'none';
+                this.progressFill.style.width = '0%';
+                this.statusChip.className = 'status-chip idle';
+                this.statusChip.textContent = 'Ready';
+            }, 2000);
+        }
+
+        async convertBatchItem(item, usedNames) {
+            const statusEl = document.getElementById(`status-${item.id}`);
+            const dlBtn = document.getElementById(`dl-${item.id}`);
+
+            item.status = 'converting';
+            if (statusEl) {
+                statusEl.className = 'fmt-file-status converting';
+                statusEl.textContent = 'Converting';
+            }
+
+            try {
+                const quality = parseInt(this.qualityRange.value) / 100;
+                const blob = await this.convertFile(item.file, this.outFormat, quality);
+                
+                item.resultBlob = blob;
+                item.status = 'done';
+
+                const baseName = item.file.name.substring(0, item.file.name.lastIndexOf('.')) || item.file.name;
+                let targetName = `${baseName}.${this.outExt}`;
+                let counter = 1;
+                while (usedNames.has(targetName)) {
+                    targetName = `${baseName}-${counter}.${this.outExt}`;
+                    counter++;
+                }
+                usedNames.add(targetName);
+                item.resultName = targetName;
+
+                if (statusEl) {
+                    statusEl.className = 'fmt-file-status done';
+                    statusEl.textContent = 'Done';
+                }
+                if (dlBtn) {
+                    dlBtn.style.display = 'inline-block';
+                    dlBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const url = URL.createObjectURL(item.resultBlob);
+                        const link = document.createElement('a');
+                        link.download = item.resultName;
+                        link.href = url;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    };
+                }
+            } catch (err) {
+                console.error(err);
+                item.status = 'error';
+                if (statusEl) {
+                    statusEl.className = 'fmt-file-status error';
+                    statusEl.textContent = 'Error';
+                }
+            }
+        }
+
+        async downloadBatchZip() {
+            const successfulItems = this.batchFiles.filter(item => item.status === 'done' && item.resultBlob);
+            if (successfulItems.length === 0) return;
+
+            this.statusChip.className = 'status-chip processing';
+            this.statusChip.textContent = 'Zipping...';
+
+            try {
+                const zip = new JSZip();
+                successfulItems.forEach(item => {
+                    zip.file(item.resultName, item.resultBlob);
+                });
+
+                const content = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(content);
+                const link = document.createElement('a');
+                link.download = `Highspring_BatchExport_${Date.now()}.zip`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                this.statusChip.className = 'status-chip success';
+                this.statusChip.textContent = 'Zipped';
+            } catch (err) {
+                console.error(err);
+                alert("ZIP archive generation failed.");
+            }
+
+            setTimeout(() => {
+                this.statusChip.className = 'status-chip idle';
+                this.statusChip.textContent = 'Ready';
+            }, 1500);
+        }
+
+        clearBatch() {
+            this.batchFiles.forEach(item => {
+                if (item.thumbUrl) URL.revokeObjectURL(item.thumbUrl);
+            });
+            this.batchFiles = [];
+            this.batchQueue.innerHTML = '';
+            this.batchFileInput.value = '';
+            this.updateBatchUI();
         }
 
         clearAll() {
