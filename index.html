@@ -2184,7 +2184,13 @@
                     <div class="control-row">
                         <label>Base Color <span>Dark → Bright →</span></label>
                         <div class="color-management-container">
-                            <input type="color" id="geo-color" value="#072942" style="width:100%;height:80px;border:1px solid rgba(255,255,255,0.15);">
+                            <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
+                                <input type="color" id="geo-color" value="#072942" style="width:100%;height:50px;border:1px solid rgba(255,255,255,0.15);">
+                                <div style="display:flex; flex-direction:column; gap:2px; position:relative;">
+                                    <input type="text" id="geo-color-hex" value="#072942" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:4px 8px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="#HEX">
+                                    <span id="geo-color-hex-error" style="display:none; color:#ff4a4a; font-size:9px; font-family:'JetBrains Mono',monospace; margin-top:2px;">Invalid HEX</span>
+                                </div>
+                            </div>
                             <div class="swatch-palette-grid" id="brand-palette">
                                 <button class="color-swatch-btn active" style="background:#072942;" data-color="#072942" title="Dark Blue"></button>
                                 <button class="color-swatch-btn" style="background:#286070;" data-color="#286070" title="Teal"></button>
@@ -2290,9 +2296,13 @@
                             <button class="shape-img-swatch" data-color="#E8F0F2" style="background:#E8F0F2;" title="Gray Blue" aria-label="Gray Blue"></button>
                             <button class="shape-img-swatch" data-color="#FFFFFF" style="background:#FFFFFF;" title="White" aria-label="White"></button>
                         </div>
-                        <div class="shape-img-custom-color">
+                        <div class="shape-img-custom-color" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <label for="shape-img-custom-color-picker">Custom:</label>
                             <input type="color" id="shape-img-custom-color-picker" value="#2DBFF9" title="Pick a custom background color">
+                            <div style="display:flex; flex-direction:column; position:relative;">
+                                <input type="text" id="shape-img-custom-color-hex" value="#2DBFF9" style="width:72px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:3px 6px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="#HEX">
+                                <span id="shape-img-custom-color-hex-error" style="display:none; color:#ff4a4a; font-size:9px; font-family:'JetBrains Mono',monospace; position:absolute; top:24px; left:0; white-space:nowrap;">Invalid HEX</span>
+                            </div>
                         </div>
                     </div>
 
@@ -2679,7 +2689,13 @@
                     <div class="control-row">
                         <label>Color Tint — Applied to All Files <span>Dark → Bright →</span></label>
                         <div class="color-management-container">
-                            <input type="color" id="png-color-picker" value="#F95C15" style="width:100%;height:80px;border:1px solid rgba(255,255,255,0.15);">
+                            <div style="display:flex; flex-direction:column; gap:6px; width:100%;">
+                                <input type="color" id="png-color-picker" value="#F95C15" style="width:100%;height:50px;border:1px solid rgba(255,255,255,0.15);">
+                                <div style="display:flex; flex-direction:column; gap:2px; position:relative;">
+                                    <input type="text" id="png-color-hex" value="#F95C15" style="width:100%; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:4px 8px; color:var(--color-white); font-family:'JetBrains Mono',monospace; font-size:11px; outline:none;" placeholder="#HEX">
+                                    <span id="png-color-hex-error" style="display:none; color:#ff4a4a; font-size:9px; font-family:'JetBrains Mono',monospace; margin-top:2px;">Invalid HEX</span>
+                                </div>
+                            </div>
                             <div class="swatch-palette-grid" id="png-brand-palette">
                                 <button class="color-swatch-btn" style="background:#072942;" data-color="#072942" title="Dark Blue"></button>
                                 <button class="color-swatch-btn" style="background:#286070;" data-color="#286070" title="Teal"></button>
@@ -3820,6 +3836,21 @@
     </main>
 
     <script>
+    /* ─── HEX COLOR PARSER HELPER ──────────────────────────────── */
+    function parseHexColor(hex) {
+        let clean = hex.trim();
+        if (clean.startsWith('#')) clean = clean.slice(1);
+        
+        if (clean.length === 3) {
+            clean = clean.split('').map(char => char + char).join('');
+        }
+        
+        if (clean.length === 6 && /^[0-9a-fA-F]{6}$/.test(clean)) {
+            return '#' + clean.toLowerCase();
+        }
+        return null;
+    }
+
     /* ─── SPA NAVIGATION ──────────────────────────────────────── */
     const sectionMeta = {
         'presets':          { title: 'Shape Presets',           subtitle: 'Predefined Studio Output Formats' },
@@ -4091,6 +4122,8 @@
             this.geoH = document.getElementById('geo-height');
             this.geoR = document.getElementById('geo-radius');
             this.geoC = document.getElementById('geo-color');
+            this.geoHex = document.getElementById('geo-color-hex');
+            this.geoHexError = document.getElementById('geo-color-hex-error');
             this.lblGeoW = document.getElementById('lbl-geo-w');
             this.lblGeoH = document.getElementById('lbl-geo-h');
             this.lblGeoR = document.getElementById('lbl-geo-r');
@@ -4101,7 +4134,30 @@
             this.geoW.addEventListener('input', e => this.updateGeometry('w', e.target.value));
             this.geoH.addEventListener('input', e => this.updateGeometry('h', e.target.value));
             this.geoR.addEventListener('input', e => this.updateGeometry('r', e.target.value));
-            this.geoC.addEventListener('input', e => { this.clearSwatchSelection(); this.updateGeometry('color', e.target.value); });
+            
+            this.geoC.addEventListener('input', e => { 
+                this.clearSwatchSelection(); 
+                if (this.geoHex) {
+                    this.geoHex.value = e.target.value.toUpperCase();
+                    if (this.geoHexError) this.geoHexError.style.display = 'none';
+                }
+                this.updateGeometry('color', e.target.value); 
+            });
+
+            if (this.geoHex) {
+                this.geoHex.addEventListener('input', e => {
+                    const parsed = parseHexColor(e.target.value);
+                    if (parsed) {
+                        if (this.geoHexError) this.geoHexError.style.display = 'none';
+                        this.geoC.value = parsed;
+                        this.clearSwatchSelection();
+                        this.updateGeometry('color', parsed);
+                    } else {
+                        if (this.geoHexError) this.geoHexError.style.display = 'block';
+                    }
+                });
+            }
+
             this.btnStratPrimary.addEventListener('click', () => {
                 this.config.diagonalStrategy = 'primary';
                 this.btnStratPrimary.classList.add('active');
@@ -4124,6 +4180,10 @@
                 e.target.classList.add('active');
                 const col = e.target.getAttribute('data-color');
                 this.geoC.value = col;
+                if (this.geoHex) {
+                    this.geoHex.value = col.toUpperCase();
+                    if (this.geoHexError) this.geoHexError.style.display = 'none';
+                }
                 this.updateGeometry('color', col);
             }));
         }
@@ -4213,6 +4273,8 @@
         initBgPaletteControls() {
             const swatchContainer = document.getElementById('shape-img-swatches');
             const customPicker    = document.getElementById('shape-img-custom-color-picker');
+            const customHex       = document.getElementById('shape-img-custom-color-hex');
+            const hexError        = document.getElementById('shape-img-custom-color-hex-error');
             if (!swatchContainer || !customPicker) return;
 
             this.bgSwatches = swatchContainer.querySelectorAll('.shape-img-swatch');
@@ -4226,7 +4288,12 @@
                     this.bgSwatches.forEach(s => s.classList.remove('active'));
                     swatch.classList.add('active');
                     const col = swatch.getAttribute('data-color');
-                    customPicker.value = this._hexFromAny(col);
+                    const hexColor = this._hexFromAny(col);
+                    customPicker.value = hexColor;
+                    if (customHex) {
+                        customHex.value = hexColor.toUpperCase();
+                        if (hexError) hexError.style.display = 'none';
+                    }
                     this.config.color = col;
                     this.render();
                 });
@@ -4234,9 +4301,29 @@
 
             customPicker.addEventListener('input', e => {
                 this.bgSwatches.forEach(s => s.classList.remove('active'));
-                this.config.color = e.target.value;
+                const col = e.target.value;
+                if (customHex) {
+                    customHex.value = col.toUpperCase();
+                    if (hexError) hexError.style.display = 'none';
+                }
+                this.config.color = col;
                 this.render();
             });
+
+            if (customHex) {
+                customHex.addEventListener('input', e => {
+                    const parsed = parseHexColor(e.target.value);
+                    if (parsed) {
+                        if (hexError) hexError.style.display = 'none';
+                        customPicker.value = parsed;
+                        this.bgSwatches.forEach(s => s.classList.remove('active'));
+                        this.config.color = parsed;
+                        this.render();
+                    } else {
+                        if (hexError) hexError.style.display = 'block';
+                    }
+                });
+            }
         }
 
         // Helper: convert any color string to a 6-digit hex for the color picker
@@ -4672,9 +4759,16 @@
             this.sliderY.addEventListener('input', e => { this.offsetY = parseInt(e.target.value); this.lblY.textContent = this.offsetY + 'px'; this.render(); });
 
             // Color picker & swatches
+            this.customHex = document.getElementById('png-color-hex');
+            this.hexError = document.getElementById('png-color-hex-error');
+
             this.pickerColor.addEventListener('input', e => {
                 this.clearSwatches();
                 this.overlayColor = e.target.value;
+                if (this.customHex) {
+                    this.customHex.value = e.target.value.toUpperCase();
+                    if (this.hexError) this.hexError.style.display = 'none';
+                }
                 this.render();
                 this.refreshAllThumbs();
             });
@@ -4682,9 +4776,29 @@
                 this.clearSwatches(); e.target.classList.add('active');
                 this.overlayColor = e.target.getAttribute('data-color');
                 this.pickerColor.value = this.overlayColor;
+                if (this.customHex) {
+                    this.customHex.value = this.overlayColor.toUpperCase();
+                    if (this.hexError) this.hexError.style.display = 'none';
+                }
                 this.render();
                 this.refreshAllThumbs();
             }));
+
+            if (this.customHex) {
+                this.customHex.addEventListener('input', e => {
+                    const parsed = parseHexColor(e.target.value);
+                    if (parsed) {
+                        if (this.hexError) this.hexError.style.display = 'none';
+                        this.pickerColor.value = parsed;
+                        this.clearSwatches();
+                        this.overlayColor = parsed;
+                        this.render();
+                        this.refreshAllThumbs();
+                    } else {
+                        if (this.hexError) this.hexError.style.display = 'block';
+                    }
+                });
+            }
 
             // Flip buttons
             if (this.btnFlipH) this.btnFlipH.addEventListener('click', () => { this.flipH = !this.flipH; this.btnFlipH.classList.toggle('active', this.flipH); this.render(); });
