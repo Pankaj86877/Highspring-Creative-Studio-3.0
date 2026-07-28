@@ -1,0 +1,23 @@
+{
+  "name": "highspring-creative-studio",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Cloud Native Studio with Vercel Serverless Architecture for AI Background Removal, Upscaling, and Generation.",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "start": "node dev-server.mjs"
+  },
+  "engines": {
+    "node": ">=18.x"
+  },
+  "keywords": [
+    "vercel",
+    "serverless",
+    "removebg",
+    "ai",
+    "studio"
+  ],
+  "author": "Highspring Studio",
+  "license": "ISC"
+}
