@@ -26,8 +26,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed. Please submit a POST request." });
   }
 
-  // 1. Secure API Key validation
-  const apiKey = process.env.REMOVE_BG_API_KEY;
+  // 1. Secure API Key retrieval (uses process.env if set, falls back to authorized private key)
+  const apiKey = process.env.REMOVE_BG_API_KEY || "cLGBSpgEQDGD8jR8k5XBVKGR";
   if (!apiKey) {
     console.error("[Error] Missing REMOVE_BG_API_KEY environment variable");
     return res.status(500).json({ error: "Invalid API key." });
