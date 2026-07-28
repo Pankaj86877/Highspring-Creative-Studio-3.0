@@ -3220,10 +3220,8 @@
 
                     <!-- Client-side mock fallback instructions -->
                     <div id="dl-server-instructions" style="display:none; font-size:11.5px; color:rgba(232,240,242,0.45); line-height:1.6; border-top:1px solid rgba(255,255,255,0.06); padding-top:16px;">
-                        <div style="font-weight:700; color:var(--color-orange); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Server Offline Fallback</div>
-                        To download actual high-resolution files directly from YouTube/Instagram, start the backend server:
-                        <code style="display:block; background:rgba(0,0,0,0.3); padding:8px 12px; border-radius:6px; margin:6px 0; color:#7ee787; font-family:'JetBrains Mono', monospace; font-size:10.5px;">python server.py</code>
-                        Otherwise, the downloader will run in <strong>high-fidelity simulator mode</strong> using public CORS-enabled media assets.
+                        <div style="font-weight:700; color:var(--color-orange); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Simulator Mode Active</div>
+                        When cloud media parsing is unavailable, the downloader automatically transitions into <strong>high-fidelity simulator mode</strong> using public CORS-enabled media assets so you can explore all UI capabilities.
                     </div>
                 </div>
 
@@ -6263,7 +6261,7 @@
             this.checkboxCompliance = document.getElementById('dl-compliance-checkbox');
             this.statusMsg = document.getElementById('dl-status-message');
 
-            this.apiBase = 'http://localhost:5000';
+            this.apiBase = '/api';
             this.isServerOnline = false;
             this.currentPlatform = null;
             this.videoInfo = null; // Received or mocked formats
@@ -6856,15 +6854,6 @@
         const downloadSvgBtn = document.getElementById('bgr-download-svg-btn');
         const statusEl       = document.getElementById('bgr-status');
 
-        // Add helpful badge "(Local Server Req.)" if running on a remote origin
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (!isLocal) {
-            const localLabels = document.querySelectorAll('#bgr-provider-existing + label');
-            localLabels.forEach(lbl => {
-                lbl.innerHTML += ' <span style="font-size: 8px; color: var(--color-orange); opacity: 0.85; margin-left: 4px;">(Local Server Req.)</span>';
-            });
-        }
-
         let _currentResultBlob = null;
 
         let selectedFile = null;
@@ -6990,10 +6979,10 @@
 
             } catch (e) {
                 statusEl.style.color = 'var(--color-orange)';
-                if (e.message && e.message.includes('Failed to fetch')) {
-                    statusEl.textContent = 'Error: Failed to fetch from local server. Please make sure server.py is running locally, or use the "Free Browser AI" provider.';
+                if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError') || e.message.includes('Network error'))) {
+                    statusEl.textContent = 'Network error. Please try again.';
                 } else {
-                    statusEl.textContent = 'Error: ' + e.message;
+                    statusEl.textContent = e.message || 'Background removal failed. Please try again.';
                 }
                 console.error(e);
             } finally {
@@ -7540,7 +7529,7 @@
 
     /* ─── AI GENERATOR & IMAGE FILLER STUDIOS ───────────────────── */
     (function () {
-        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
+        const PROXY_BASE = '';
 
         // ==========================================
         // 1. AI Image Generator Logic
@@ -8705,7 +8694,7 @@
     // 3. AI Image Upscaler Engine
     // ==========================================
     (function () {
-        const PROXY_BASE = (window.location.origin.includes('localhost:8888') || window.location.origin.includes('127.0.0.1:8888')) ? '' : 'http://localhost:8888';
+        const PROXY_BASE = '';
         const aiuFileInput = document.getElementById('aiu-file-input');
         const aiuDzZone = document.getElementById('aiu-dz-zone');
         const aiuUploadLabel = document.getElementById('aiu-upload-label');
