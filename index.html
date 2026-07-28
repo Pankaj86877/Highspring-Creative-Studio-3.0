@@ -3127,14 +3127,6 @@
                             <input type="radio" id="bgr-provider-existing" name="bgrProvider" value="existing" checked>
                             <label for="bgr-provider-existing" class="bgr-provider-label">☁️ Remove.bg API</label>
                         </div>
-                        <div class="bgr-provider-btn">
-                            <input type="radio" id="bgr-provider-magnific" name="bgrProvider" value="magnific">
-                            <label for="bgr-provider-magnific" class="bgr-provider-label">✨ Magnific API</label>
-                        </div>
-                        <div class="bgr-provider-btn">
-                            <input type="radio" id="bgr-provider-browserai" name="bgrProvider" value="browserAi">
-                            <label for="bgr-provider-browserai" class="bgr-provider-label">⚡ Free Browser AI</label>
-                        </div>
                     </div>
                 </div>
 
@@ -6864,17 +6856,10 @@
         const downloadSvgBtn = document.getElementById('bgr-download-svg-btn');
         const statusEl       = document.getElementById('bgr-status');
 
-        // Auto-select Free Browser AI if running remotely (to prevent Mixed Content "Failed to fetch" block on localhost proxy)
+        // Add helpful badge "(Local Server Req.)" if running on a remote origin
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         if (!isLocal) {
-            const browserAiRadio = document.getElementById('bgr-provider-browserai');
-            const existingRadio = document.getElementById('bgr-provider-existing');
-            if (browserAiRadio && existingRadio) {
-                existingRadio.checked = false;
-                browserAiRadio.checked = true;
-            }
-            // Add helpful badge "(Local Server Req.)" to labels
-            const localLabels = document.querySelectorAll('#bgr-provider-existing + label, #bgr-provider-magnific + label');
+            const localLabels = document.querySelectorAll('#bgr-provider-existing + label');
             localLabels.forEach(lbl => {
                 lbl.innerHTML += ' <span style="font-size: 8px; color: var(--color-orange); opacity: 0.85; margin-left: 4px;">(Local Server Req.)</span>';
             });
