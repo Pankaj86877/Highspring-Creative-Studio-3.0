@@ -56,6 +56,12 @@ window.BackgroundServices.magnific = async function(file, statusEl) {
         if (response.status === 413) {
             throw new Error("Image file is too large for cloud processing (HTTP 413). Please upload an image under 4MB.");
         }
+        // Seamless fallback to free unlimited browser AI when cloud API quota is exceeded
+        if (response.status === 402 && window.BackgroundServices.browserAi) {
+            console.warn("Cloud API quota exceeded (HTTP 402). Automatically switching to Free Unlimited Browser AI Engine...");
+            if (statusEl) statusEl.textContent = 'Cloud API quota exceeded. Automatically switching to Free Unlimited AI Engine...';
+            return await window.BackgroundServices.browserAi(file, statusEl);
+        }
         const err = await response.json().catch(() => ({}));
         throw new Error(err.message || err.error || `HTTP ${response.status}: Magnific processing failed.`);
     }

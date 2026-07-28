@@ -62,6 +62,12 @@ window.BackgroundServices.existing = async function(file, statusEl) {
         if (res.status === 413) {
             throw new Error("Image file is too large for Vercel cloud processing (HTTP 413). Please upload an image under 4MB.");
         }
+        // Seamless fallback to free unlimited browser AI when Remove.bg free credits run out
+        if (res.status === 402 && window.BackgroundServices.browserAi) {
+            console.warn("Remove.bg API cloud quota exceeded (HTTP 402). Automatically switching to Free Unlimited Browser AI Engine...");
+            if (statusEl) statusEl.textContent = 'API cloud quota exceeded. Automatically switching to Free Unlimited AI Engine...';
+            return await window.BackgroundServices.browserAi(file, statusEl);
+        }
         const err = await res.json().catch(() => ({}));
         const errMsg = err.error || err.errors?.[0]?.title || `Background removal failed (HTTP ${res.status}). Please try again.`;
         throw new Error(errMsg);
