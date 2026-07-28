@@ -26,10 +26,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed. Please submit a POST request." });
   }
 
-  // 1. Secure API Key retrieval with sanitization (strips accidental quotes and whitespace)
-  let apiKey = (process.env.REMOVE_BG_API_KEY || "cLGBSpgEQDGD8jR8k5XBVKGR").replace(/^["']|["']$/g, '').trim();
+  // 1. Secure API Key retrieval with multi-key pool fallback (primary active key + backup key)
+  const VERIFIED_KEYS = [
+    "B4HGy4aUxmq7MDLk6LbZrY7a", // Primary user key
+    "cLGBSpgEQDGD8jR8k5XBVKGR"  // Backup secondary key
+  ];
+  let apiKey = (process.env.REMOVE_BG_API_KEY || VERIFIED_KEYS[0]).replace(/^["']|["']$/g, '').trim();
   if (!apiKey) {
-    apiKey = "cLGBSpgEQDGD8jR8k5XBVKGR";
+    apiKey = VERIFIED_KEYS[0];
   }
 
   // 2. Validate upload file size limit (12MB max for Remove.bg API)
@@ -99,20 +103,29 @@ export default async function handler(req, res) {
       signal: controller.signal,
     });
 
-    // If an outdated or corrupt key in Vercel settings caused 401/403, retry once with verified fallback key
-    if ((apiResponse.status === 401 || apiResponse.status === 403) && apiKey !== "cLGBSpgEQDGD8jR8k5XBVKGR") {
-      console.warn("[Remove.bg API] Environment API key rejected (401/403). Auto-retrying with verified fallback API key...");
-      apiKey = "cLGBSpgEQDGD8jR8k5XBVKGR";
-      apiResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
-        method: 'POST',
-        headers: {
-          'Content-Type': req.headers['content-type'] || 'application/octet-stream',
-          'X-Api-Key': apiKey,
-          'User-Agent': 'Highspring-Studio-Cloud-Gateway/3.0'
-        },
-        body: buffer,
-        signal: controller.signal,
-      });
+    // Automatically switch to backup keys if current key gets 401/403 (Invalid Key) or 402/429 (Quota Exceeded)
+    if (apiResponse.status === 401 || apiResponse.status === 403 || apiResponse.status === 402 || apiResponse.status === 429) {
+      for (const backupKey of VERIFIED_KEYS) {
+        if (backupKey === apiKey) continue; // Skip the key that just failed
+        console.warn(`[Remove.bg API] Key rejected (Status ${apiResponse.status}). Cycling to backup API key...`);
+        apiKey = backupKey;
+        const retryRes = await fetch('https://api.remove.bg/v1.0/removebg', {
+          method: 'POST',
+          headers: {
+            'Content-Type': req.headers['content-type'] || 'application/octet-stream',
+            'X-Api-Key': apiKey,
+            'User-Agent': 'Highspring-Studio-Cloud-Gateway/3.0'
+          },
+          body: buffer,
+          signal: controller.signal,
+        });
+        if (retryRes.ok) {
+          apiResponse = retryRes;
+          break;
+        }
+        // Keep last failed response if none succeed
+        apiResponse = retryRes;
+      }
     }
 
     clearTimeout(timeoutId);

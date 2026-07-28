@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 
 // Populate test API keys in local development environment
-process.env.REMOVE_BG_API_KEY = process.env.REMOVE_BG_API_KEY || "cLGBSpgEQDGD8jR8k5XBVKGR";
+process.env.REMOVE_BG_API_KEY = process.env.REMOVE_BG_API_KEY || "B4HGy4aUxmq7MDLk6LbZrY7a";
 process.env.MAGNIFIC_API_KEY = process.env.MAGNIFIC_API_KEY || "MS2b105d363a4f4971844d5a2bbd030437";
 
 const MIME_TYPES = {
