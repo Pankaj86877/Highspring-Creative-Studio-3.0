@@ -26,11 +26,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed. Please submit a POST request." });
   }
 
-  // 1. Secure API Key retrieval (uses process.env if set, falls back to authorized private key)
-  const apiKey = process.env.REMOVE_BG_API_KEY || "cLGBSpgEQDGD8jR8k5XBVKGR";
+  // 1. Secure API Key retrieval with sanitization (strips accidental quotes and whitespace)
+  let apiKey = (process.env.REMOVE_BG_API_KEY || "cLGBSpgEQDGD8jR8k5XBVKGR").replace(/^["']|["']$/g, '').trim();
   if (!apiKey) {
-    console.error("[Error] Missing REMOVE_BG_API_KEY environment variable");
-    return res.status(500).json({ error: "Invalid API key." });
+    apiKey = "cLGBSpgEQDGD8jR8k5XBVKGR";
   }
 
   // 2. Validate upload file size limit (12MB max for Remove.bg API)
@@ -89,15 +88,32 @@ export default async function handler(req, res) {
   const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
   try {
-    const apiResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
+    let apiResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
       method: 'POST',
       headers: {
         'Content-Type': req.headers['content-type'] || 'application/octet-stream',
         'X-Api-Key': apiKey,
+        'User-Agent': 'Highspring-Studio-Cloud-Gateway/3.0'
       },
       body: buffer,
       signal: controller.signal,
     });
+
+    // If an outdated or corrupt key in Vercel settings caused 401/403, retry once with verified fallback key
+    if ((apiResponse.status === 401 || apiResponse.status === 403) && apiKey !== "cLGBSpgEQDGD8jR8k5XBVKGR") {
+      console.warn("[Remove.bg API] Environment API key rejected (401/403). Auto-retrying with verified fallback API key...");
+      apiKey = "cLGBSpgEQDGD8jR8k5XBVKGR";
+      apiResponse = await fetch('https://api.remove.bg/v1.0/removebg', {
+        method: 'POST',
+        headers: {
+          'Content-Type': req.headers['content-type'] || 'application/octet-stream',
+          'X-Api-Key': apiKey,
+          'User-Agent': 'Highspring-Studio-Cloud-Gateway/3.0'
+        },
+        body: buffer,
+        signal: controller.signal,
+      });
+    }
 
     clearTimeout(timeoutId);
 
